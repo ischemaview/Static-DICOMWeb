@@ -23,6 +23,60 @@ WRITE_ERROR = -4
 #EXCEPTION = -5
 #INPUT_DATA_INVALID_SIZE = -7
 
+def is_dicom_3Dable(filelist): # returns volume, and pydicom header/ds
+    for fn in filelist:
+        try:
+            start = time.time()
+            print("INFO (is_dicom_3Dable): Reading %s" % (fn))
+
+            ds = pydicom.dcmread(fn, stop_before_pixels = True)
+
+            print("DICOM Validation for Study/Series => %s/%s" % (ds.StudyInstanceUID, ds.SeriesInstanceUID))
+
+            imageType = ds.ImageType
+            matches = ['LOCALIZER', 'SCOUT', 'SECONDARY']
+            if any( x in imageType for x in matches):
+                print("ImageType check FAIL!!")
+                return False
+            print("ImageType check PASS!!")
+
+            if not ds.Modality in ['CT', 'MR', 'PET']:
+                print("Modality check FAIL!!")
+                return False
+            print("Modality check PASS!!")
+            
+            if not hasattr(ds, "InstanceNumber"):
+                if hasattr(ds, 'NumberOfFrames'):
+                    if ds.NumberOfFrames <= 1:
+                        print("Multi Frames check FAIL!!")
+                        return False
+                    else:
+                        print("Multi Frames check PASS!!")
+                        return True
+                print("Instance Number check FAIL!!")
+                return False
+            print("Instance Number check PASS!!")
+
+
+            # if hasattr(ds, 'NumberOfFrames'):
+            #     if ds.NumberOfFrames <= 1:
+            #         return False
+            # else:
+            #     if len(filelist) <= 1:
+            #         return False
+
+            # print("Nos Of Frames check PASS!!")
+            return True
+
+        except Exception:
+            filelist.remove(fn)
+            print("ERROR (is_dicom_3Dable):Exception Occured while reading file =>%s" % (fn))
+            continue
+        end = time.time()
+        elapsed_time = end - start
+        print("TIME Taken in secs (is_dicom_3Dable) : %s" % (elapsed_time))
+    return False
+
 
 def read_filelist(filelist_filename) -> List[str]:
    
@@ -81,6 +135,7 @@ class RPDReadDICOM(object):
         self.header1 = None
         self.verbose_level = verbose_level
         self.working_directory = ''
+        self.is_enhanced_ct = None
         if working_directory is not None:
             self.working_directory = working_directory
 
@@ -136,7 +191,7 @@ class RPDReadDICOM(object):
             return INPUT_DATA_INVALID
         
         if self.verbose_level >= 2:
-            print("RPDPyDcm: Loading " + str(len(dicom_files)) + " DICOM files ...")
+            print("RPDPyDcm: Loading " + str(len(dicom_files)) + " DICOM file(s) ...")
 
         slice_position_list = []
         instance_nr_list = []                
@@ -684,7 +739,7 @@ class RPDReadDICOM(object):
                 volume_np = np.flip(volume_np, 0)
                 self.interslice_distance_list.reverse()
                 self.slice_thickness_list.reverse()
-                self.table_position_list.reverse()
+                table_position_list.reverse()
                 self.ipp_list_np = np.flip(self.ipp_list_np, 0)
                 self.iop_list_np = np.flip(self.iop_list_np, 0)          
 
@@ -731,6 +786,7 @@ class RPDReadDICOM(object):
             print('\n'.join(ll))
         
         
+        self.is_enhanced_ct = is_enhanced_ct
         self.interslice_distance_list_orig = self.interslice_distance_list
         self.slice_thickness_list_orig = self.slice_thickness_list
         self.iop_list_np_orig = self.iop_list_np
@@ -1138,8 +1194,8 @@ class RPDReadDICOM(object):
             self.slice_thickness_list = [target_pz] * new_nz
             self.interslice_distance_list = [target_pz] * (new_nz-1)
                             
-            new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float)
-            new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float)
+            new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float32)
+            new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float32)
             
             nz2 = int(np.floor(len(group_to_merge) / 2.0))            
             z = 0
@@ -1199,8 +1255,8 @@ class RPDReadDICOM(object):
             self.slice_thickness_list = [target_pz] * new_nz
             self.interslice_distance_list = [target_pz] * (new_nz-1)
                            
-            new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float)
-            new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float)
+            new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float32)
+            new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float32)
             
             nz2 = int(np.floor(len(group_to_merge) / 2.0))       
             
@@ -1286,8 +1342,8 @@ class RPDReadDICOM(object):
         current_volume_z = 0
         current_spacing = self.volume.GetSpacing()
         
-        new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float)
-        new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float)
+        new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float32)
+        new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float32)
                     
         # merge the slices by averaging
         # last merge, if incomplete, will be merged from fewer slices
@@ -1381,12 +1437,6 @@ class RPDReadDICOM(object):
             return True
         else:
             return False
-
-
-
-        
-
-
 
 def export_dicoms(sitk_volume,
                   dcm_ds,
@@ -1593,12 +1643,19 @@ if __name__ == "__main__":
         for [root, dirs, files] in os.walk(inputDirName):
             for f in files:
                 fn = os.path.join(root, f)
-                filenames.append(fn)
+                if fn.endswith('.dcm'):
+                    filenames.append(fn)
             break
         
         if len(filenames) == 0:
             print("Input directory %s does not contain any files" % (inputDirName), file=sys.stderr)
             sys.exit(INPUT_DATA_NOT_READABLE)
+            
+        dicom_validation = is_dicom_3Dable(filenames)
+        if not dicom_validation:
+            print("DICOM Validation FAILED!! Exiting!!")
+            sys.exit(0)
+
     else:
         
         if args.verbose >= 1:
@@ -1629,7 +1686,7 @@ if __name__ == "__main__":
     
     time1 = time.time()
     if args.verbose >= 2:
-        print("Data reading took %.1f seconds" % (time1-time0))
+        print("Reading the data took %.1f seconds" % (time1-time0))
     
     
     sitk_volume = reader.volume
@@ -1641,9 +1698,21 @@ if __name__ == "__main__":
     
     dcm_ds = reader.header1
     
+    if 'NumberOfFrames' in dcm_ds:
+        del dcm_ds.NumberOfFrames
+
+    if [0x5200, 0x9229] in dcm_ds:
+        del dcm_ds[0x5200, 0x9229]
+    
+    if [0x5200, 0x9230] in dcm_ds:
+        del dcm_ds[0x5200, 0x9230]
+        
+    
     seriesUID_orig_ = ''
+    seriesUID_orig = ''
     if hasattr(dcm_ds, "SeriesInstanceUID"):
-        seriesUID_orig_ = str(dcm_ds.SeriesInstanceUID) + "_"
+        seriesUID_orig = str(dcm_ds.SeriesInstanceUID)
+        seriesUID_orig_ = seriesUID_orig + "_"
     
     dcm_ds.SeriesDate = time.strftime("%Y%m%d")
     dcm_ds.SeriesTime = time.strftime("%H%M%S")
@@ -1703,8 +1772,22 @@ if __name__ == "__main__":
     output_n_slices = args.number_of_slices
     
     resampling_ratio = float(output_n_slices) / float(input_n_slices)
-    new_spacing_z = float(input_n_slices) * spacing1[2] / float(output_n_slices)
     
+    # if resampling_ratio <= 0.5:
+        
+    #     merge_factor = int(np.floor(1.0 / resampling_ratio))
+        
+    #     if merge_factor >= 2:
+    #         reader.merge_slices(merge_factor)
+            
+    #         sitk_volume = reader.volume
+    #         size1 = sitk_volume.GetSize()
+    #         spacing1 = sitk_volume.GetSpacing()
+    
+    #         input_n_slices = size1[2]
+        
+    
+    new_spacing_z = float(input_n_slices) * spacing1[2] / float(output_n_slices)
     sitk_volume2 = None
     
     if output_n_slices < input_n_slices:
@@ -1717,12 +1800,17 @@ if __name__ == "__main__":
         
         if (gantry_tilt_correction_would_be_needed == False) and (resampling_ratio <= 0.5):
             
-            merge_factor_z = int(np.round(1.0 / resampling_ratio))
-            sitk_volume_temp = sitk.Mean(sitk_volume, (1,1, merge_factor_z))
+            
+            sigmaZ = spacing1[2] / resampling_ratio
+
+            gaussianFilter = sitk.SmoothingRecursiveGaussianImageFilter()
+            gaussianFilter.SetSigma([0.001, 0.001, sigmaZ])
+            sitk_volume_temp = gaussianFilter.Execute(sitk_volume_temp)
+                    
             
         
-        new_spacing = [sitk_volume.GetSpacing()[0],
-                       sitk_volume.GetSpacing()[1],
+        new_spacing = [sitk_volume_temp.GetSpacing()[0],
+                       sitk_volume_temp.GetSpacing()[1],
                        new_spacing_z]
                        
         new_size = [size1[0], 
@@ -1734,10 +1822,10 @@ if __name__ == "__main__":
                                   transform = sitk.Transform(),
                                   interpolator = sitk.sitkLinear,
                                   defaultPixelValue = -1024,
-                                  outputOrigin = sitk_volume.GetOrigin(), 
+                                  outputOrigin = sitk_volume_temp.GetOrigin(), 
                                   outputSpacing = new_spacing, 
-                                  outputPixelType = sitk_volume.GetPixelID(),
-                                  outputDirection = sitk_volume.GetDirection())
+                                  outputPixelType = sitk_volume_temp.GetPixelID(),
+                                  outputDirection = sitk_volume_temp.GetDirection())
 
     else:
         if args.verbose >= 1:
@@ -1757,6 +1845,8 @@ if __name__ == "__main__":
     dcm_ds.SeriesNumber = str(sn)
     dcm_ds.SeriesInstanceUID = pydicom.uid.generate_uid(prefix=ISCHEMAVIEW_UID_PREFIX+".")
     dcm_ds.SeriesDescription = sd
+    dcm_ds.FrameOfReferenceUID = seriesUID_orig
+    dcm_ds.ImageType = "DERIVED\\SECONDARY\\INTERPOLATED\\" + str(int(input_n_slices)) + "\\" + str(int(output_n_slices))
 
     filenames2 = export_dicoms(sitk_volume2, 
                                dcm_ds, 

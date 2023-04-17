@@ -47,19 +47,15 @@ def is_dicom_3Dable(filelist): # returns volume, and pydicom header/ds
                 print("Modality check FAIL!!")       
                 return False
             print("Modality check PASS!!")
-
-            if hasattr(ds, 'ImagePositionPatient'):
-                image_position = ds.ImagePositionPatient
-                # If there are 3 values in the ImagePositionPatient attribute, it is likely a 3D volume
-                if len(image_position) != 3:
-                    print("IPP check FAIL!!")
-                    return False
-            else:
-                print("IPP check FAIL!!")
-                return False
-            print("IPP check PASS!!")
             
             if not hasattr(ds, "InstanceNumber"):
+                if hasattr(ds, 'NumberOfFrames'):
+                    if ds.NumberOfFrames <= 1:
+                        print("Multi Frames check FAIL!!")
+                        return False
+                    else:
+                        print("Multi Frames check PASS!!")
+                        return True
                 print("Instance Number check FAIL!!")
                 return False
             print("Instance Number check PASS!!")
@@ -118,6 +114,7 @@ class RPDReadDICOM(object):
         self.header1 = None
         self.verbose_level = verbose_level
         self.working_directory = ''
+        self.is_enhanced_ct = None
         if working_directory is not None:
             self.working_directory = working_directory
 
@@ -178,7 +175,7 @@ class RPDReadDICOM(object):
             return INPUT_DATA_INVALID
         
         if self.verbose_level >= 2:
-            print("RPDPyDcm: Loading " + str(len(dicom_files)) + " DICOM files ...")
+            print("RPDPyDcm: Loading " + str(len(dicom_files)) + " DICOM file(s) ...")
 
         slice_position_list = []
         instance_nr_list = []                
@@ -198,20 +195,20 @@ class RPDReadDICOM(object):
             try:
                 dcm1 = pydicom.read_file(dicom_file, stop_before_pixels=True)
             except IOError as e:
-                print("File read error ({0}): {1}, {2}".format(e.errno, e.strerror, dicom_file),
+                print("Warning: File read error ({0}): {1}, {2}".format(e.errno, e.strerror, dicom_file),
                       file=sys.stderr)
-                return INPUT_DATA_NOT_READABLE
-        
+                #return INPUT_DATA_NOT_READABLE
+                continue
             except: #handle other exceptions 
-                print("Unexpected error: {0}, {1}".format(sys.exc_info()[0], dicom_file),
+                print("Warning: Unexpected error: {0}, {1}".format(sys.exc_info()[0], dicom_file),
                       file=sys.stderr)
-                return INPUT_DATA_NOT_READABLE
-
+                #return INPUT_DATA_NOT_READABLE
+                continue
 
             ts = dcm1.file_meta.TransferSyntaxUID
             if ts.is_compressed:
                 if self.verbose_level >= 4:
-                    print("File is compressed with transfer syntax %s (%s)" % (str(ts), ts.value))
+                    print("File is compressed with transfer syntax %s (%s)" % (str(ts), ts.name))
             
 
             is_enhanced_ct = False
@@ -726,7 +723,7 @@ class RPDReadDICOM(object):
                 volume_np = np.flip(volume_np, 0)
                 self.interslice_distance_list.reverse()
                 self.slice_thickness_list.reverse()
-                self.table_position_list.reverse()
+                table_position_list.reverse()
                 self.ipp_list_np = np.flip(self.ipp_list_np, 0)
                 self.iop_list_np = np.flip(self.iop_list_np, 0)          
 
@@ -762,7 +759,7 @@ class RPDReadDICOM(object):
                                           "{0:0.3}".format(spacing1[2]) +
                                           " mm")
 
-        if self.verbose_level >= 3:
+        if self.verbose_level >= 4:
             print("RPDPyDcm: Slice Thickness: ")
             ll = ["\tSlice {}: {:.3f}".format(*e) for e in enumerate(self.slice_thickness_list)]
             print('\n'.join(ll))
@@ -773,6 +770,7 @@ class RPDReadDICOM(object):
             print('\n'.join(ll))
         
         
+        self.is_enhanced_ct = is_enhanced_ct
         self.interslice_distance_list_orig = self.interslice_distance_list
         self.slice_thickness_list_orig = self.slice_thickness_list
         self.iop_list_np_orig = self.iop_list_np
@@ -869,13 +867,13 @@ class RPDReadDICOM(object):
                 shifted_slice1 = sitk.Resample(slice1, slice1, translation, interpolator,
                                                default_value)
 
-                tmpimg = sitk.JoinSeries(shifted_slice1)
-
-                paster = sitk.PasteImageFilter()
-                paster.SetDestinationIndex((0,0,z))
-                paster.SetSourceIndex((0,0,0))
-                paster.SetSourceSize(tmpimg.GetSize())
-                self.volume = paster.Execute(self.volume, tmpimg)
+                    #tmpimg = sitk.JoinSeries(shifted_slice1)
+                    #paster = sitk.PasteImageFilter()
+                    #paster.SetDestinationIndex((0,0,z))
+                    #paster.SetSourceIndex((0,0,0))
+                    #paster.SetSourceSize(tmpimg.GetSize())
+                    #self.volume = paster.Execute(self.volume, tmpimg)
+                self.volume[:,:,z] = shifted_slice1
                 
                 ipp = ipp + iop_x * shift_x
                 ipp = ipp + iop_y * shift_y
@@ -1164,16 +1162,21 @@ class RPDReadDICOM(object):
         # the one with originally thin slices and the top group was originally
         # the thick (target) slice group
         if group_to_merge[0] < group_to_keep[0]:
-            paster1 = sitk.PasteImageFilter()
-            paster1.SetDestinationIndex((0,0,0))
-            paster1.SetSourceIndex((0,0,0))
-            paster1.SetSourceSize(halfSliceVolMerged.GetSize())
-            newVol = paster1.Execute(newVol, halfSliceVolMerged)
+            #paster1 = sitk.PasteImageFilter()
+            #paster1.SetDestinationIndex((0,0,0))
+            #paster1.SetSourceIndex((0,0,0))
+            #paster1.SetSourceSize(halfSliceVolMerged.GetSize())
+            #newVol = paster1.Execute(newVol, halfSliceVolMerged)
+            nzz = halfSliceVolMerged.GetSize()[2]
+            newVol[:,:,0:nzz] = halfSliceVolMerged
             
-            paster1.SetDestinationIndex((0,0,halfSliceVolMerged.GetSize()[2]))
-            paster1.SetSourceIndex((0,0,0))
-            paster1.SetSourceSize(fullSliceVol.GetSize())
-            newVol = paster1.Execute(newVol, fullSliceVol)
+            #paster1.SetDestinationIndex((0,0,halfSliceVolMerged.GetSize()[2]))
+            #paster1.SetSourceIndex((0,0,0))
+            #paster1.SetSourceSize(fullSliceVol.GetSize())
+            #newVol = paster1.Execute(newVol, fullSliceVol)
+            nzz2 = fullSliceVol.GetSize()[2]
+            newVol[:,:,nzz:nzz+nzz2] = fullSliceVol
+            
 
             newVol.SetOrigin(halfSliceVol.GetOrigin())
             newVol.SetDirection(halfSliceVol.GetDirection())
@@ -1185,8 +1188,8 @@ class RPDReadDICOM(object):
             self.slice_thickness_list = [target_pz] * new_nz
             self.interslice_distance_list = [target_pz] * (new_nz-1)
                             
-            new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float)
-            new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float)
+            new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float32)
+            new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float32)
             
             nz2 = int(np.floor(len(group_to_merge) / 2.0))            
             z = 0
@@ -1219,17 +1222,22 @@ class RPDReadDICOM(object):
             # and the top group was originally with the thin slices
             
             
-            paster1 = sitk.PasteImageFilter()
+            #paster1 = sitk.PasteImageFilter()
             
-            paster1.SetDestinationIndex((0,0,0))
-            paster1.SetSourceIndex((0,0,0))
-            paster1.SetSourceSize(fullSliceVol.GetSize())
-            newVol = paster1.Execute(newVol, fullSliceVol)
+            #paster1.SetDestinationIndex((0,0,0))
+            #paster1.SetSourceIndex((0,0,0))
+            #paster1.SetSourceSize(fullSliceVol.GetSize())
+            #newVol = paster1.Execute(newVol, fullSliceVol)            
+            nzz = fullSliceVol.GetSize()[2]
+            newVol[:,:,0:nzz] = fullSliceVol
             
-            paster1.SetDestinationIndex((0,0,fullSliceVol.GetSize()[2]))
-            paster1.SetSourceIndex((0,0,0))
-            paster1.SetSourceSize(halfSliceVolMerged.GetSize())
-            newVol = paster1.Execute(newVol, halfSliceVolMerged)
+            
+            #paster1.SetDestinationIndex((0,0,fullSliceVol.GetSize()[2]))
+            #paster1.SetSourceIndex((0,0,0))
+            #paster1.SetSourceSize(halfSliceVolMerged.GetSize())
+            #newVol = paster1.Execute(newVol, halfSliceVolMerged)
+            nzz2 = halfSliceVolMerged.GetSize()[2]
+            newVol[:,:,nzz:nzz+nzz2] = halfSliceVolMerged
 
             newVol.SetOrigin(fullSliceVol.GetOrigin())
             newVol.SetDirection(fullSliceVol.GetDirection())
@@ -1241,8 +1249,8 @@ class RPDReadDICOM(object):
             self.slice_thickness_list = [target_pz] * new_nz
             self.interslice_distance_list = [target_pz] * (new_nz-1)
                            
-            new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float)
-            new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float)
+            new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float32)
+            new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float32)
             
             nz2 = int(np.floor(len(group_to_merge) / 2.0))       
             
@@ -1281,9 +1289,10 @@ class RPDReadDICOM(object):
                                               "{0:0.3}".format(spacing1[1]) + " x " +
                                               "{0:0.3}".format(spacing1[2]) + " mm")
 
-        print("RPDPyDcm: Slice thicknesses: ")    
-        ll = ["\tSlice {}: {:.3f}".format(*e) for e in enumerate(self.slice_thickness_list)]
-        print('\n'.join(ll))
+        if self.verbose_level >= 4:
+            print("RPDPyDcm: Slice thicknesses: ")    
+            ll = ["\tSlice {}: {:.3f}".format(*e) for e in enumerate(self.slice_thickness_list)]
+            print('\n'.join(ll))
         
         end = time.time()
         elapsed_time = end - start
@@ -1333,8 +1342,8 @@ class RPDReadDICOM(object):
         current_volume_z = 0
         current_spacing = self.volume.GetSpacing()
         
-        new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float)
-        new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float)
+        new_ipp_list_np = np.zeros((new_nz, 3), dtype = np.float32)
+        new_iop_list_np = np.zeros((new_nz, 3, 3), dtype = np.float32)
                     
         # merge the slices by averaging
         # last merge, if incomplete, will be merged from fewer slices
@@ -1505,10 +1514,18 @@ def export_dicoms(sitk_volume,
             ds = pydicom.dataset.FileDataset(fn, dcm_ds,
                          file_meta=file_meta, preamble=b"\0" * 128)
             
-            if(verboseLevel >= 2):
+            if(verboseLevel >= 3):
                 print("Writing %s" % (fn))
-            if instance_nr > 1:
-                pydicom.dcmwrite(fn, ds, write_like_original=False)
+            
+            try:
+                if instance_nr > 1:
+                    pydicom.dcmwrite(fn, ds, write_like_original=False)
+            except IOError as e:
+                print("File write error ({0}): {1}, {2}".format(e.errno, e.strerror, fn))
+                sys.exit(WRITE_ERROR)
+            except: #handle other exceptions such as attribute errors
+                print("Unexpected error:", sys.exc_info()[0])
+                raise
         
             filenames.append(fn)
             instance_nr = instance_nr + 1
@@ -1659,6 +1676,16 @@ if __name__ == "__main__":
     retcode1 = reader.read_from_list(filenames)
     sitk_volume = reader.volume
     dcm_ds = reader.header1
+    
+    if 'NumberOfFrames' in dcm_ds:
+        del dcm_ds.NumberOfFrames
+
+    if [0x5200, 0x9229] in dcm_ds:
+        del dcm_ds[0x5200, 0x9229]
+    
+    if [0x5200, 0x9230] in dcm_ds:
+        del dcm_ds[0x5200, 0x9230]
+        
     
     seriesUID_orig_ = ''
     seriesUID_orig = ''
