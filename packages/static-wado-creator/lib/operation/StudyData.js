@@ -1,5 +1,7 @@
 const path = require("path");
 const fs = require("fs");
+const fs2 = require("fs").promises;
+const zlib = require("zlib");
 const hashFactory = require("node-object-hash");
 const { JSONReader, JSONWriter } = require("@radicalimaging/static-wado-util");
 const { Tags } = require("@radicalimaging/static-wado-util");
@@ -9,6 +11,8 @@ const { getValue, setValue, getList, setList } = Tags;
 const hasher = hashFactory();
 
 const getSeriesInstanceUid = (seriesInstance) => getValue(seriesInstance, Tags.SeriesInstanceUID);
+
+const getImageInstanceUid = (imageInstance) => getValue(imageInstance, Tags.SOPInstanceUID);
 
 /**
  * StudyData contains information about the grouped study data.  It is used to create
@@ -307,9 +311,9 @@ class StudyData {
         console.log("Cant get seriesUid from", Tags.SeriesInstanceUID, seriesInstance);
         continue;
       }
+      const seriesPath = path.join(this.studyPath, "series", seriesInstanceUid);
       if (!series[seriesInstanceUid]) {
         const seriesQuery = TagLists.extract(seriesInstance, "series", TagLists.SeriesQuery);
-        const seriesPath = path.join(this.studyPath, "series", seriesInstanceUid);
         series[seriesInstanceUid] = {
           seriesPath,
           seriesQuery,
@@ -317,15 +321,38 @@ class StudyData {
           instancesQuery: [],
         };
       }
+      const sopInstanceUid = getImageInstanceUid(seriesInstance);
+      const rawdata = await fs2.readFile(path.join(seriesPath, "instances", sopInstanceUid, "frames", "1"));
+      console.log('rawdata.byteLength=' + rawdata.byteLength);
+
+      // const gunzip = zlib.createGunzip();
+      // gunzip.write(rawdata);
+      // gunzip.on("data", (data) => {
+      //   console.log(`data.byteLength=${data.byteLength}`);
+      // });
+
+      const rawStream = fs.createWriteStream(path.join(seriesPath, "1"), {
+        flags: "a",
+        encoding: null,
+        mode: '0666',
+      });
+      await rawStream.write(rawdata);
+      rawStream.close();
+
       series[seriesInstanceUid].instances.push(seriesInstance);
       series[seriesInstanceUid].instancesQuery.push(TagLists.extract(seriesInstance, "instance", TagLists.InstanceQuery));
     }
-
     const seriesList = [];
     const modalitiesInStudy = [];
     let numberOfInstances = 0;
     let numberOfSeries = 0;
     for (const seriesUid of Object.keys(series)) {
+
+      const inputCombineFile = fs.createReadStream(path.join(this.studyPath, "series", seriesUid, "1"));
+      const outputCombineFile = fs.createWriteStream(path.join(this.studyPath, "series", seriesUid, "1.gz"));
+      const gzip = zlib.createGzip();
+      inputCombineFile.pipe(gzip).pipe(outputCombineFile);
+
       const singleSeries = series[seriesUid];
       const { seriesQuery, seriesPath, instances, instancesQuery } = singleSeries;
       seriesQuery[Tags.NumberOfSeriesRelatedInstances] = {

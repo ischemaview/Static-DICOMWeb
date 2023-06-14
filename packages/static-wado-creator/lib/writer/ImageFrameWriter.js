@@ -20,7 +20,7 @@ const ImageFrameWriter = (options) => {
 
     if (encapsulatedImageFrame || !extension) {
       const writeStream = WriteStream(id.imageFrameRootPath, `${1 + index}`, {
-        gzip: type.gzip,
+        //gzip: type.gzip,
         mkdir: true,
       });
       await WriteMultipart(

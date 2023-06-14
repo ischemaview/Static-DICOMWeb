@@ -11,6 +11,7 @@ const getDataSet = require("./operation/getDataSet");
 const InstanceDeduplicate = require("./operation/InstanceDeduplicate");
 const DeduplicateWriter = require("./writer/DeduplicateWriter");
 const ImageFrameWriter = require("./writer/ImageFrameWriter");
+const CombineImageFrameWriter = require("./writer/CombineImageFrameWriter");
 const CompleteStudyWriter = require("./writer/CompleteStudyWriter");
 const IdCreator = require("./util/IdCreator");
 const ScanStudy = require("./operation/ScanStudy");
@@ -47,6 +48,7 @@ class StaticWado {
       uids: IdCreator(this.options),
       bulkdata: HashDataWriter(this.options),
       imageFrame: ImageFrameWriter(this.options),
+      combineImageFrame: CombineImageFrameWriter(this.options),
       videoWriter: VideoWriter(this.options),
       thumbWriter: ThumbnailWriter(this.options),
       completeStudy: CompleteStudyWriter(this.options),
@@ -177,7 +179,23 @@ class StaticWado {
           );
         }
 
-        return this.callback.imageFrame(transcodedId, currentImageFrameIndex, transcodedImageFrame);
+        id.buffersize = transcodedImageFrame.length;
+
+        //console.log("*********************** buffersize = " + transcodedImageFrame.length);
+
+        const uri = this.callback.imageFrame(transcodedId, currentImageFrameIndex, transcodedImageFrame);
+
+        return uri;
+      },
+      combineFrames: async (originalImageFrame) => {
+        // const { imageFrame: transcodedImageFrame, id: transcodedId } = await transcodeImageFrame(id, targetId, originalImageFrame, dataSet, this.options);
+
+        // const currentImageFrameIndex = imageFrameIndex;
+        // imageFrameIndex += 1;
+
+        //const uri = this.callback.combineImageFrame(transcodedId, currentImageFrameIndex, transcodedImageFrame);
+
+        return "";
       },
       videoWriter: async (_dataSet) => this.callback.videoWriter(id, _dataSet),
     };
@@ -198,7 +216,7 @@ class StaticWado {
     // resolve promise with statistics
     return {};
   }
-
+  
   /**
    * The mkdicomweb command first runs mkdicomwebinstances, writing out the deduplicated data, and then runs the
    * mkdicomwebstudy command, creating the deduplicated data set.  This version, however, keeps the deduplicated
