@@ -1640,10 +1640,10 @@ if __name__ == "__main__":
         sys.exit(0)
 
 
-    # dicom_validation = is_dicom_3Dable(filenames)
-    # if not dicom_validation:
-    #     print("DICOM Validation FAILED!! Exiting!!")
-    #     sys.exit(0)
+    dicom_validation = is_dicom_3Dable(filenames)
+    if not dicom_validation:
+        print("DICOM Validation FAILED!! Exiting!!")
+        sys.exit(0)
 
     if args.verbose >= 1:
         print("Reading input DICOM data from %s" % (inputDirName))
