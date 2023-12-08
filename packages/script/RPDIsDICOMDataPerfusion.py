@@ -16,9 +16,10 @@ import re
 
 # DICOM reader errors
 NO_ERROR = 0
+NOT_PERFUSION_SERIES = 1
 INPUT_DATA_NOT_READABLE = -1
 INPUT_DATA_INVALID = -2
-WRITE_ERROR = -4
+#WRITE_ERROR = -4
 #EXCEPTION = -5
 #INPUT_DATA_INVALID_SIZE = -7
 
@@ -360,7 +361,7 @@ class RPDReadDICOM2(object):
         # if nothing was left to read, then stop
         if len(slice_position_list) == 0:
             print('No valid CT slices found in the input list.', file=sys.stderr)
-            return INPUT_DATA_INVALID
+            return NOT_PERFUSION_SERIES
         
         
         # now, do some data consistency checks
@@ -436,6 +437,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-fl",
         "--filelist",
+        required = False,
         help="input file list containing references to input DICOM files",
     )
     parser.add_argument(
@@ -524,7 +526,7 @@ if __name__ == "__main__":
     
     if retcode1 != 0:
         print("DICOM data read error", file=sys.stderr)
-        sys.exit(INPUT_DATA_NOT_READABLE)
+        sys.exit(NOT_PERFUSION_SERIES)
     
     time1 = time.time()
     if args.verbose >= 2:
