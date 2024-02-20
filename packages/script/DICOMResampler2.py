@@ -12,6 +12,7 @@ import numpy as np
 import SimpleITK as sitk
 import argparse
 import re
+import binascii
 
 ISCHEMAVIEW_UID_PREFIX = "1.3.6.1.4.1.39822"
 
@@ -1540,7 +1541,8 @@ def export_dicoms(sitk_volume,
             
             dcm_ds.InstanceNumber = instance_nr
             dcm_ds.PixelData = slice1_np.tobytes()
-            dcm_ds.SOPInstanceUID = pydicom.uid.generate_uid(prefix=ISCHEMAVIEW_UID_PREFIX+".")
+            dcm_ds.SOPInstanceUID = ISCHEMAVIEW_UID_PREFIX + "." + str(binascii.crc32((dcm_ds.SeriesInstanceUID).encode('utf8'))) + "." + str(slice_no)
+            #dcm_ds.SOPInstanceUID = pydicom.uid.generate_uid(prefix=ISCHEMAVIEW_UID_PREFIX+".")
             dcm_ds.PixelSpacing = [slice1_spacing[0], slice1_spacing[1]]
             dcm_ds.ImagePositionPatient = [slice1_origin[0], slice1_origin[1], slice1_origin[2]]
             
@@ -1901,7 +1903,8 @@ if __name__ == "__main__":
 
 
     dcm_ds.SeriesNumber = str(sn)
-    dcm_ds.SeriesInstanceUID = pydicom.uid.generate_uid(prefix=ISCHEMAVIEW_UID_PREFIX+".")
+    dcm_ds.SeriesInstanceUID = ISCHEMAVIEW_UID_PREFIX + "." + str(binascii.crc32((dcm_ds.SeriesInstanceUID).encode('utf8')))
+    #dcm_ds.SeriesInstanceUID = pydicom.uid.generate_uid(prefix=ISCHEMAVIEW_UID_PREFIX+".")
     dcm_ds.SeriesDescription = sd
     dcm_ds.FrameOfReferenceUID = seriesUID_orig
     dcm_ds.ImageType = "DERIVED\\SECONDARY\\INTERPOLATED\\" + str(int(input_n_slices)) + "\\" + str(int(output_n_slices))
