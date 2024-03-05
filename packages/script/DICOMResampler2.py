@@ -1774,9 +1774,10 @@ if __name__ == "__main__":
     if hasattr(dcm_ds, "SeriesInstanceUID"):
         seriesUID_orig = str(dcm_ds.SeriesInstanceUID)
         seriesUID_orig_ = seriesUID_orig + "_"
-    
-    dcm_ds.SeriesDate = time.strftime("%Y%m%d")
-    dcm_ds.SeriesTime = time.strftime("%H%M%S")
+
+    # Default to Source Series Date/Time/Tz
+    # dcm_ds.SeriesDate = time.strftime("%Y%m%d")
+    # dcm_ds.SeriesTime = time.strftime("%H%M%S")
     
         
     sn = 0
