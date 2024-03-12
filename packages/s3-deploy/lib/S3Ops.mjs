@@ -16,7 +16,7 @@ const imagejpeg = "image/jpeg";
 const applicationDicom = "application/dicom";
 
 /** Key patterns to not cache */
-const noCachePattern = /(index.html)|(studies$)|(series$)|(theme\/)|(^[a-zA-Z0-9\-_]+\.js)|(config\/)/;
+// const noCachePattern = /(index.html)|(studies$)|(series$)|(theme\/)|(^[a-zA-Z0-9\-_]+\.js)|(config\/)/;
 
 // const prefixSlash = (str) => (str && str[0] !== "/" ? `/${str}` : str);
 const noPrefixSlash = (str) => (str && str[0] === "/" ? str.substring(1) : str);
@@ -159,7 +159,6 @@ class S3Ops {
     const Metadata = this.fileToMetadata(file, hash);
     const ContentEncoding = this.fileToContentEncoding(file);
     const fileName = this.toFile(dir, file);
-    const isNoCacheKey = Key.match(noCachePattern);
     // iOS17+ version having issues with cached images. It crashes the application
     // https://developer.apple.com/forums/thread/737042
     const CacheControl = "no-cache";

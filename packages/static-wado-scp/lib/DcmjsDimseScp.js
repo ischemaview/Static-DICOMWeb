@@ -60,10 +60,12 @@ class DcmjsDimseScp extends Scp {
     try {
       contexts.forEach((c) => {
         const context = association.getPresentationContext(c.id);
+        // StorageClass.add("ECG", '1.2.840.10008.5.1.4.1.1.9.1.1');
+        const extendedStorageClass = { ...StorageClass, ECG: "1.2.840.10008.5.1.4.1.1.9.1.1" };
         if (
           context.getAbstractSyntaxUid() === SopClass.Verification ||
           context.getAbstractSyntaxUid() === SopClass.StudyRootQueryRetrieveInformationModelFind ||
-          Object.values(StorageClass).includes(context.getAbstractSyntaxUid())
+          Object.values(extendedStorageClass).includes(context.getAbstractSyntaxUid())
         ) {
           const transferSyntaxes = context.getTransferSyntaxUids();
           const transferSyntax = PreferredTransferSyntax.find((tsuid) => transferSyntaxes.find((contextTsuid) => contextTsuid === tsuid));

@@ -1,4 +1,4 @@
-import { JSONReader, JSONWriter, handleHomeRelative } from "@radicalimaging/static-wado-util";
+import { JSONReader, JSONWriter } from "@radicalimaging/static-wado-util";
 import DeployGroup from "./DeployGroup.mjs";
 
 /**
