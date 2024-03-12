@@ -10,6 +10,7 @@ export default function commonMain(config, name, options, storeF) {
           return storeF(deployment, name, options, deployPlugin);
         }
         console.log("skipping deployment", deployment.name);
+        return null;
       })
     );
   }
