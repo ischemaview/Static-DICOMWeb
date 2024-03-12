@@ -5,6 +5,7 @@ import uploadSeriesIndex from "./uploadSeriesIndex.mjs";
 export default async function (studyUID, seriesUID, options) {
   console.log("studyUID=", studyUID);
   console.log("seriesUID=", seriesUID);
+  console.time("Series upload total time taken");
 
   const studySeriesDirectory = studyUID && seriesUID ? `studies/${studyUID}/series/${seriesUID}` : "studies";
   const studySeriesIndexDirectory = studyUID ? `studies/${studyUID}/series` : "studies";
@@ -38,4 +39,5 @@ export default async function (studyUID, seriesUID, options) {
   } else {
     console.log("Not calling commonMain to not upload series Index");
   }
+  console.timeEnd("Series upload total time taken");
 }

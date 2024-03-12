@@ -53,7 +53,35 @@ class DeployGroup {
       }
       // await Promise.all(names.map((childName) => this.store(relativeName, childName)));
     } else {
-      await this.ops.upload(this.baseDir, relativeName, null, lstat.size);
+      // console.log("relativeName=" + relativeName);
+      // let fileObj = {};
+      // fileObj["baseDir"] = this.baseDir;
+      // fileObj["relativeName"] = relativeName;
+      // fileObj["size"] = lstat.size;
+      // this.listOfFiles.push(fileObj);
+      // await this.ops.upload(this.baseDir, relativeName, null, lstat.size);
+    }
+  }
+
+  async uploadFile(baseDir, relativeName, fileSize) {
+    this.ops.upload(baseDir, relativeName, null, fileSize);
+  }
+
+  async storeFile(parentDir = "", name = "") {
+    const fileName = path.join(this.baseDir, parentDir, name);
+    const lstat = await fs.promises.lstat(fileName);
+    const relativeName = (name && `${parentDir}/${name}`) || parentDir || "";
+    console.log("relativeName", relativeName);
+    if (lstat.isDirectory()) {
+      console.log("Reading directory", fileName);
+      const names = await fs.promises.readdir(fileName);
+      for (const childName of names) {
+        await this.store(relativeName, childName);
+      }
+      // await Promise.all(names.map((childName) => this.store(relativeName, childName)));
+    } else {
+      console.log(`relativeName=${relativeName}`);
+      // await this.ops.upload(this.baseDir, relativeName, null, lstat.size);
     }
   }
 

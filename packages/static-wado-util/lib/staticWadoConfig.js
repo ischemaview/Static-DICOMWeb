@@ -29,6 +29,7 @@ const { staticWadoConfig } = ConfigPoint.register({
           suffix: "html",
         },
       },
+      prependBulkDataUri:'',
     },
   },
 });
