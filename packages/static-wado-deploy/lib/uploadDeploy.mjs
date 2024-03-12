@@ -3,13 +3,7 @@ import DeployGroup from "./DeployGroup.mjs";
 
 const files = [];
 
-export default async function uploadMain(
-  storeDirectory,
-  config,
-  name,
-  options,
-  deployPlugin
-) {
+export default async function uploadMain(storeDirectory, config, name, options, deployPlugin) {
   const deployer = new DeployGroup(config, name, options, deployPlugin);
   await deployer.loadOps();
 
@@ -20,13 +14,7 @@ export default async function uploadMain(
   function uploadFile(deployer, fileObject) {
     return new Promise((resolve, reject) => {
       try {
-        resolve(
-          deployer.uploadFile(
-            fileObject.baseDir,
-            fileObject.relativeName,
-            fileObject.size
-          )
-        );
+        resolve(deployer.uploadFile(fileObject.baseDir, fileObject.relativeName, fileObject.size));
       } catch (e) {
         reject();
       }
