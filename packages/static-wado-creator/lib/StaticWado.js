@@ -1,3 +1,6 @@
+const childProcess = require("child_process");
+const util = require("util");
+
 const dicomCodec = require("@cornerstonejs/dicom-codec");
 const { Stats, handleHomeRelative } = require("@radicalimaging/static-wado-util");
 const dicomParser = require("dicom-parser");
@@ -19,6 +22,8 @@ const ThumbnailService = require("./operation/ThumbnailService");
 const DeleteStudy = require("./DeleteStudy");
 const RejectInstance = require("./RejectInstance");
 const RawDicomWriter = require("./writer/RawDicomWriter");
+
+const exec = util.promisify(childProcess.exec);
 
 function setStudyData(studyData) {
   this.studyData = studyData;
@@ -142,7 +147,10 @@ class StaticWado {
 
     let bulkDataIndex = 0;
     let imageFrameIndex = 0;
-    const thumbnailService = new ThumbnailService();
+    let thumbnailService = null;
+    if (this.options.geneateThumbnail) {
+      thumbnailService = new ThumbnailService();
+    }
 
     const generator = {
       bulkdata: async (bulkData, options) => {
@@ -156,16 +164,18 @@ class StaticWado {
         const currentImageFrameIndex = imageFrameIndex;
         imageFrameIndex += 1;
 
-        thumbnailService.queueThumbnail(
-          {
-            imageFrame: originalImageFrame,
-            transcodedImageFrame,
-            transcodedId,
-            id,
-            frameIndex: currentImageFrameIndex,
-          },
-          this.options
-        );
+        if (this.options.geneateThumbnail) {
+          thumbnailService.queueThumbnail(
+            {
+              imageFrame: originalImageFrame,
+              transcodedImageFrame,
+              transcodedId,
+              id,
+              frameIndex: currentImageFrameIndex,
+            },
+            this.options
+          );
+        }
 
         return this.callback.imageFrame(transcodedId, currentImageFrameIndex, transcodedImageFrame);
       },
@@ -178,7 +188,10 @@ class StaticWado {
     await this.callback.rawDicomWriter?.(id, result, buffer);
 
     const transcodedMeta = transcodeMetadata(result.metadata, id, this.options);
-    thumbnailService.generateThumbnails(id, dataSet, transcodedMeta, this.callback);
+
+    if (this.options.geneateThumbnail) {
+      thumbnailService.generateThumbnails(id, dataSet, transcodedMeta, this.callback);
+    }
 
     await this.callback.metadata(targetId, transcodedMeta);
 
@@ -203,6 +216,16 @@ class StaticWado {
 
   async close() {
     await this.callback.completeStudy();
+
+    if (this.options.isAutoDeployS3) {
+      const { rootDir, s3ClientDir, s3RgBucket, s3CgBucket, s3EnvAccount, s3EnvRegion } = this.options;
+      const command = `deploydicomweb -rd "${rootDir}" -s3cd "${s3ClientDir}" -s3rgb "${s3RgBucket}" -s3cgb "${s3CgBucket}" -s3ea "${s3EnvAccount}" -s3er "${s3EnvRegion}"`;
+      console.log({ command });
+      const { stdout, stderr } = await exec(command);
+
+      console.log("Rejected output:", stdout, stderr);
+    }
+
     Stats.OverallStats.summarize("Completed Study Processing");
   }
 

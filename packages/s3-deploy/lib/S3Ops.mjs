@@ -16,7 +16,7 @@ const imagejpeg = "image/jpeg";
 const applicationDicom = "application/dicom";
 
 /** Key patterns to not cache */
-const noCachePattern = /(index.html)|(studies$)|(theme\/)|(^[a-zA-Z0-9\-_]+\.js)|(config\/)/;
+const noCachePattern = /(index.html)|(studies$)|(series$)|(theme\/)|(^[a-zA-Z0-9\-_]+\.js)|(config\/)/;
 
 // const prefixSlash = (str) => (str && str[0] !== "/" ? `/${str}` : str);
 const noPrefixSlash = (str) => (str && str[0] === "/" ? str.substring(1) : str);
@@ -42,10 +42,10 @@ class S3Ops {
    */
   fileToKey(file) {
     let fileName = file.replaceAll("\\", "/");
-    if( fileName===this.config.indexFullName ) {
+    if (fileName === this.config.indexFullName) {
       console.log("Is index", fileName);
-      const lastSlash = fileName.lastIndexOf('/');
-      fileName=fileName.substring(0,lastSlash+1) + 'index.json.gz';
+      const lastSlash = fileName.lastIndexOf("/");
+      fileName = `${fileName.substring(0, lastSlash + 1)}index.json.gz`;
     }
     if (compressedRe.test(fileName)) {
       fileName = fileName.substring(0, fileName.length - 3);
@@ -159,6 +159,8 @@ class S3Ops {
     const Metadata = this.fileToMetadata(file, hash);
     const ContentEncoding = this.fileToContentEncoding(file);
     const fileName = this.toFile(dir, file);
+    // iOS17+ version having issues with cached images. It crashes the application
+    // https://developer.apple.com/forums/thread/737042
     const isNoCacheKey = Key.match(noCachePattern);
     const CacheControl = isNoCacheKey ? "no-cache" : undefined;
     const Body = fs.createReadStream(fileName);

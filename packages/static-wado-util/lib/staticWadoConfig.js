@@ -18,6 +18,7 @@ const { staticWadoConfig } = ConfigPoint.register({
       groupNames: ["root", "client"],
       rootGroup: {
         path: "/dicomweb",
+        index: "index",
         IndexDocument: {
           suffix: "json",
         },
@@ -28,6 +29,7 @@ const { staticWadoConfig } = ConfigPoint.register({
           suffix: "html",
         },
       },
+      prependBulkDataUri: "",
     },
   },
 });

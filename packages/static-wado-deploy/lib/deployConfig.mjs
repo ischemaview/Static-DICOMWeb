@@ -1,6 +1,7 @@
 import ConfigPoint from "config-point";
 import { staticWadoConfig } from "@radicalimaging/static-wado-util";
 import studiesMain from "./studiesMain.mjs";
+import seriesmain from "./seriesMain.mjs";
 import clientMain from "./clientMain.mjs";
 import themeMain from "./themeMain.js";
 
@@ -33,9 +34,48 @@ const { deployConfig } = ConfigPoint.register({
         defaultValue: undefined,
       },
       {
+        key: "-rd, --root-dir <rootDir>",
+        description: "Root directory of static wado",
+        defaultValue: "~/dicomweb",
+      },
+      {
+        key: "-indexonly, --indexonly",
+        description: "upload only index file",
+        defaultValue: false,
+      },
+      {
+        key: "-cg, --customer-group <customerGroup>",
+        description: "Name of customer group",
+      },
+      {
+        key: "-cn, --customer-name <customerName>",
+        description: "Name of customer",
+      },
+      {
         key: "-v, --verbose",
         description: "Write verbose output",
         defaultValue: false,
+      },
+      {
+        key: "-s3cd, --s3-client-dir <s3ClientDir>",
+        description: "S3 client directory of static wado",
+        defaultValue: "~/ohif",
+      },
+      {
+        key: "-s3rgb, --s3-rg-bucket <s3RootGroupBucket>",
+        description: "S3 root group bucket of static wado",
+      },
+      {
+        key: "-s3cgb, --s3-cg-bucket <s3ClientGroupBucket>",
+        description: "S3 client group bucket of static wado",
+      },
+      {
+        key: "-s3ea, --s3-env-account <s3EnvAccount>",
+        description: "S3 account environment of static wado",
+      },
+      {
+        key: "-s3er, --s3-env-region <s3EnvRegion>",
+        description: "S3 region environment of static wado",
       },
     ],
 
@@ -54,6 +94,21 @@ const { deployConfig } = ConfigPoint.register({
         ],
         isDefault: true,
         main: studiesMain,
+      },
+      {
+        command: "series [studyUID] [seriesUID]",
+        arguments: ["studyUID", "seriesUID"],
+        helpShort: "deploydicomweb series [studyUID] [seriesUID]",
+        helpDescription: "Deploy DICOMweb files to the cloud",
+        options: [
+          {
+            key: "--no-index",
+            description: "Don't create or update the index files",
+            defaultValue: true,
+          },
+        ],
+        isDefault: true,
+        main: seriesmain,
       },
       {
         command: "client",
