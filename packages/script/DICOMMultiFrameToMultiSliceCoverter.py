@@ -23,7 +23,13 @@ def convert_multiframe_to_multislice(dicom_file, output_directory, verboseLevel)
     # Load the DICOM file
     ds = pydicom.dcmread(dicom_file)
     ds.remove_private_tags()
-
+    
+    # Decompress the pixel data (if necessary)
+    try:
+        ds.decompress()
+    except Exception as e:
+        print(f"Error decompressing pixel data: {e}")
+    
     # Extract pixel data from the DICOM file
     pixel_array = ds.pixel_array
 
